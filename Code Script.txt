@@ -218,25 +218,74 @@ private void evaluateAccuracyNeuroph(MultiLayerPerceptron neuralNet, DataSet tes
 ***********************************
 *[Neuroph Class MSNE - one output]*
 ***********************************
-TBC
+    private void calculateMeanSquaredError(MultiLayerPerceptron neuralNet, DataSet test) {
+        double sumError = 0, meanSquaredError;
+        for (DataSetRow row : test) {
+
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+
+            double predicted = neuralNet.getOutput()[0];
+            double actual = row.getDesiredOutput()[0];
+
+            double error = Math.pow((predicted - actual), 2);
+            sumError += error;
+        }
+
+        meanSquaredError = (double) sumError / (2 * test.size());
+        System.out.println("MSE: " + meanSquaredError);
+}
 *********************************************************************
 
 ****************************************
 *[Neuroph Class MSNE - multiple output]*
 ****************************************
-TBC
+    private void calculateMSE(MultiLayerPerceptron neuralNet, DataSet test) {
+        double error = 0;
+        for (DataSetRow row : test) {
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+
+//Nizovi su u pitanju
+            double[] actual = row.getDesiredOutput();
+            double[] predicted = neuralNet.getOutput();
+
+//For petlja ovde!
+            for (int i = 0; i < actual.length; i++) {
+                error += Math.pow(actual[i] - predicted[i], 2);
+            }
+        }
+
+        double mse = error / (2 * test.size());
+        System.out.println("MSE: " + mse);
+    }
 *********************************************************************
 
 ******************************************
 *[Neuroph Class MSNENeuroph - one output]*
 ******************************************
-TBC
+//Evaluator je binary!
+    private void calculateMeanSquaredErrorNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation evaluation = new Evaluation();
+        evaluation.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        evaluation.evaluate(neuralNet, test);
+
+        System.out.println("MSE Neuroph: " + evaluation.getMeanSquareError());
+    }
 *********************************************************************
 
 ***********************************************
 *[Neuroph Class MSNENeuroph - multiple output]*
 ***********************************************
-TBC
+//Evaluator je multiclass!
+     private void calculateMSENeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation evaluation = new Evaluation();
+        String[] classLabels = {"s1", "s2", "s3", "s4", "s5", "s6", "s7"};
+        evaluation.addEvaluator(new ClassifierEvaluator.MultiClass(classLabels));
+        evaluation.evaluateData(neuralNet, test);
+
+        System.out.println("MSE Neuroph: " + evaluation.getMeanSquareError());
+    }
 *********************************************************************
 
 ***************************
