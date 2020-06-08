@@ -1,0 +1,259 @@
+******************
+*[Training Class]*
+******************
+//od ova dva ide samo ono sto se trazi
+    public double accuracy;
+    public double msne;
+
+//ovo ide uvek
+    public NeuralNetwork neuralNet;
+    
+    public Training() {
+        
+    }
+    
+    public Training(double accuracy, double msne, NeuralNetwork neuralNet) {
+        this.accuracy = accuracy;
+        this.neuralNet = neuralNet;
+	this.msne = msne;
+    }
+*********************************************************************
+
+****************************
+*[Neuroph Class attributes]*
+****************************
+//sve ovo imamo uvek, dato u tekstu zadatka
+    int inputCount = 9;
+    int outputCount = 7;
+    ArrayList<Training> trainings = new ArrayList<>();
+    double[] learningRates = {0.2, 0.4, 0.6};
+    int[] hiddenNeurons = {10, 20, 30};
+*********************************************************************
+
+**********************
+*[Neuroph Class main]*
+**********************
+    public static void main(String[] args) {
+        new NeurophClass().run();
+    }
+*********************************************************************
+
+******************************
+*[Neuroph Class run - part I]*
+******************************
+//Ovaj deo uvek ide ovako, ucitavanje csv->normalizacija->shuffle
+    DataSet data = DataSet.createFromFile("naziv csv-a", input, output, ",");
+    MaxNormalizer max = new MaxNormalizer(data);
+    max.normalize(data)
+    data.shuffle();
+
+//Podela data seta, parametri u zadatku
+    DataSet[] split = data.split(0.65,0.35);
+    DataSet train = split[0];
+    DataSet test = split[1];
+
+//Inicijalizacija broja iteracija i treninga
+    int iterations=0;
+    int trainings=0;
+*********************************************************************
+
+*******************************
+*[Neuroph Class run - part II]*
+*******************************
+//Dve for petlje, uvek iste
+    for(double l: lr) {
+       for(int h: hn) {
+              System.out.println("Learning rate: " + l + ". Hidden Neurons: " + h);
+//Inicijalizacija mreze
+              MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(input,h,output);  
+              neuralNet.setLearningRule(new MomentumBackpropagation());
+              MomentumBackpropagation bp = (MomentumBackpropagation) neuralNet.getLearningRule();
+
+//Ovo uvek, momentum je dat u tekstu
+              bp.setMomentum(0.6);               
+              bp.setMaxError(0.07);
+              bp.setLearningRate(l);
+              neuralNet.learn(train);
+//Ovde se poziva ona funkcija koju nam zadatak zahteva
+              pozivFunkcije()
+//Povecavanje treninga i iteracija, uvek isto                
+              trainings++;
+              iterations+=bp.getCurrentIteration();
+//Dodavanje treninga u niz treninga, uvek isto                
+              array.add(new Training(accuracy,neuralNet));
+            }
+        }
+*********************************************************************
+
+********************************
+*[Neuroph Class run - part III]*
+********************************
+//Ispisujemo prosecan broj iteracija i pozivamo funkciju za serijalizaciju koja nam je trazeno
+    System.out.println("Iteration average: " + (double)iterations/trainings);
+    serialize();
+*********************************************************************
+
+***************************************
+*[Neuroph Class accuracy - one output]*
+***************************************
+//Uvek ide ovako ako imamo samo jednu izlaznu
+public double calculateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
+        
+        int tp=0,fp=0,fn=0,tn=0;
+        
+        for(DataSetRow row : test) {
+            
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+            
+            double actual = row.getDesiredOutput()[0];
+            double predicted = neuralNet.getOutput()[0];
+         
+             if (actual == 1.0 && predicted > 0.5) {
+                tp++;
+            }
+            if (actual == 0.0 && predicted <= 0.5) {
+                tn++;
+            }
+            if (actual == 1.0 && predicted <= 0.5) {
+                fn++;
+            }
+            if (actual == 0.0 && predicted > 0.5) {
+                fp++;
+            }
+            
+        }
+
+//Formula za preciznost tj. sve sto smo tacno predvideli
+        double accuracy = (double)(tp+tn)/(tp+tn+fn+fp);
+        System.out.println("Accuracy: " + accuracy);
+        return accuracy; 
+}
+*********************************************************************
+
+********************************************
+*[Neuroph Class accuracy - multiple output]*
+********************************************
+public double calculateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
+//Onoliko naziva koliko imamo izlaznih promenljivih
+        String[] classLabels = {"s1", "s2", "s3", "s4", "s5", "s6", "s7"};
+        ConfusionMatrix mk = new ConfusionMatrix(classLabels);
+
+        for (DataSetRow row : test) {
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+
+//getMaxInArray je pomocna funkcija, prosta funkcija za nalazenje maksimuma u nizu double vrednosti	
+            int actual = getMaxInArray(row.getDesiredOutput());
+            int predicted = getMaxInArray(neuralNet.getOutput());
+
+            mk.incrementElement(actual, predicted);
+        }
+        
+        System.out.println(mk.toString());
+
+        double accuracy = 0;
+
+        for (int i = 0; i < output; i++) {
+            int tp = mk.getTruePositive(i);
+            int tn = mk.getTrueNegative(i);
+            int fp = mk.getFalsePositive(i);
+            int fn = mk.getFalseNegative(i);
+
+            accuracy += (double) (tp + tn) / (tp + tn + fp + fn);
+        }
+
+        double averageAcc = (double) accuracy / output;
+
+        System.out.println("Accuracy: " + averageAcc);
+
+        return averageAcc;
+    }
+*********************************************************************
+
+**********************************************
+*[Neuroph Class accuracyNeuroph - one output]*
+**********************************************
+//Razlika izmedju multiple i one output je samo evaluator tj Binary vs MultiClass
+private void evaluateAccuracyNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        
+        //Ovde sve napamet
+        Evaluation evaluation = new Evaluation();
+        evaluation.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        evaluation.evaluate(neuralNet, test);
+
+        ClassifierEvaluator evaluator = evaluation.getEvaluator(ClassifierEvaluator.Binary.class);
+        ConfusionMatrix cm = evaluator.getResult();
+        System.out.println(cm.toString());
+
+        ClassificationMetrics[] metrics = ClassificationMetrics.createFromMatrix(cm);
+        ClassificationMetrics.Stats average = ClassificationMetrics.average(metrics);
+
+        System.out.println("Accuracy neuroph: " + average.accuracy);
+
+    }
+*********************************************************************
+
+***************************************************
+*[Neuroph Class accuracyNeuroph - multiple output]*
+***************************************************
+//Razlika izmedju multiple i one output je samo evaluator tj Binary vs MultiClass
+    public void calculateAccuracyNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation evaluation = new Evaluation();
+        String[] classLabels = {"s1", "s2", "s3", "s4", "s5", "s6", "s7"};
+        evaluation.addEvaluator(new ClassifierEvaluator.MultiClass(classLabels));
+        evaluation.evaluate(neuralNet, test);
+
+        ClassifierEvaluator evaluator = evaluation.getEvaluator(ClassifierEvaluator.MultiClass.class);
+        ConfusionMatrix cm = evaluator.getResult();
+        System.out.println(cm.toString());
+
+        ClassificationMetrics[] metrics = ClassificationMetrics.createFromMatrix(cm);
+        ClassificationMetrics.Stats average = ClassificationMetrics.average(metrics);
+
+        System.out.println("Accuracy neuroph: " + average.accuracy);
+    }
+*********************************************************************
+
+***********************************
+*[Neuroph Class MSNE - one output]*
+***********************************
+TBC
+*********************************************************************
+
+****************************************
+*[Neuroph Class MSNE - multiple output]*
+****************************************
+TBC
+*********************************************************************
+
+******************************************
+*[Neuroph Class MSNENeuroph - one output]*
+******************************************
+TBC
+*********************************************************************
+
+***********************************************
+*[Neuroph Class MSNENeuroph - multiple output]*
+***********************************************
+TBC
+*********************************************************************
+
+***************************
+*[Neuroph Class Serialize]*
+***************************
+//Umesto uslova pisemo accuracy/msne, zavisi sta nam se trazi
+//Umesto max moze biti i min
+    public void serialize() {
+        
+        Training max = array.get(0);
+        for(Training t : array) {
+            if(max.uslov<t.uslov) {
+                max = t;
+            }
+        }
+        System.out.println("Saving file");
+        max.neuralNet.save("file.nnet");
+        
+    }
+*********************************************************************
