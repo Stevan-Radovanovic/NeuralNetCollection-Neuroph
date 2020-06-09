@@ -4,6 +4,9 @@ package neurophwines;
 import java.util.ArrayList;
 import org.neuroph.core.data.DataSet;
 import org.neuroph.core.data.DataSetRow;
+import org.neuroph.eval.ClassifierEvaluator;
+import org.neuroph.eval.Evaluation;
+import org.neuroph.eval.classification.ClassificationMetrics;
 import org.neuroph.eval.classification.ConfusionMatrix;
 import org.neuroph.nnet.MultiLayerPerceptron;
 import org.neuroph.nnet.learning.MomentumBackpropagation;
@@ -23,13 +26,17 @@ public class NeurophWines {
     
     public void run () {
         
+        System.out.println("Reading dataset from csv...");
         DataSet data = DataSet.createFromFile("wines.csv",input,output,",");
         MaxNormalizer norm = new MaxNormalizer(data);
+        System.out.println("Normalizing data...");
         norm.normalize(data);
+        System.out.println("Shuffling data...");
         data.shuffle();
         
         int numOfTrainings=0, numOfIterations=0;
         
+        System.out.println("Spliting data...");
         DataSet[] yo = data.split(0.7,0.3);
         DataSet train = yo[0];
         DataSet test = yo[1];
@@ -47,6 +54,8 @@ public class NeurophWines {
                 
                 numOfTrainings++;
                 numOfIterations+=mbp.getCurrentIteration();
+                
+                System.out.println("Commencing Training no." + numOfTrainings);
                 
                 double accuracy = 0;
                 double msne = 0;
@@ -68,6 +77,9 @@ public class NeurophWines {
         System.out.println("Iterations average: " + (double)numOfIterations/numOfTrainings);
         
     }
+   
+    
+    
     
     public void serializeMaxAcc() {
         Training max = trainings.get(0);
@@ -174,6 +186,47 @@ public class NeurophWines {
        msne = (double)sumError/(2*test.size());
        System.out.println("MSNE: " + msne);
        return msne;
+    }
+    
+    public void calculateAccuracyNeurophOneOutput(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation evaluation = new Evaluation();
+        evaluation.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        evaluation.evaluate(neuralNet, test);
+        
+        ConfusionMatrix cm = evaluation.getEvaluator(ClassifierEvaluator.Binary.class).getResult();
+        ClassificationMetrics[] metrics = ClassificationMetrics.createFromMatrix(cm);
+        ClassificationMetrics.Stats average = ClassificationMetrics.average(metrics);
+        
+        System.out.println("Accuracy Neuroph: " + average.accuracy);
+    }
+    
+    public void calculateAccuracyNeurophMultiOutput(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation evaluation = new Evaluation();
+        evaluation.addEvaluator(new ClassifierEvaluator.MultiClass(new String[]{"s1","s2","s3"}));
+        evaluation.evaluate(neuralNet, test);
+        
+        ConfusionMatrix cm = evaluation.getEvaluator(ClassifierEvaluator.MultiClass.class).getResult();
+        ClassificationMetrics[] metrics = ClassificationMetrics.createFromMatrix(cm);
+        ClassificationMetrics.Stats average = ClassificationMetrics.average(metrics);
+        
+        System.out.println("Accuracy Neuroph: " + average.accuracy);
+    }
+    
+    public void calculateMsneNeurophOneOutput(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation evaluation = new Evaluation();
+        evaluation.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        evaluation.evaluate(neuralNet, test);
+        
+        System.out.println("MSNE: " + evaluation.getMeanSquareError());
+    }
+    
+    public void calculateMsneNeurophMultiOutput(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation evaluation = new Evaluation();
+        evaluation.addEvaluator(new ClassifierEvaluator.MultiClass(new String[]{"s1","s2","s3"}));
+        evaluation.evaluate(neuralNet, test);
+        
+        System.out.println("MSNE: " + evaluation.getMeanSquareError());
+        
     }
     
     public int getMaxIndexArray(double[] array) {
