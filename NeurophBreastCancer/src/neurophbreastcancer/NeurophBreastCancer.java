@@ -1,3 +1,4 @@
+
 package neurophbreastcancer;
 
 import java.util.ArrayList;
@@ -82,7 +83,6 @@ public class NeurophBreastCancer {
 
         Training t = new Training(neuralNet, meanSquaredError);
         trainings.add(t);
-
     }
 
     private void calculateMeanSquaredErrorNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
