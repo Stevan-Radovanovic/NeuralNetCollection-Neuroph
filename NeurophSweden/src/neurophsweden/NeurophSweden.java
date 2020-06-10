@@ -58,7 +58,7 @@ public class NeurophSweden {
                 MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(input,hn,output);                
                 neuralNet.setLearningRule(new MomentumBackpropagation());
                 MomentumBackpropagation mbp = (MomentumBackpropagation) neuralNet.getLearningRule();
-                mbp.setMaxError(0.07);
+                mbp.setMaxError(0.01);
                 mbp.setLearningRate(lr);
                 mbp.setMomentum(0.6);
                 
@@ -70,7 +70,7 @@ public class NeurophSweden {
                 calculateAccNeuroph(neuralNet,test);
                 double accuracy = calculateAcc(neuralNet,test);
               
-                calculateAccMsne(neuralNet,test);
+                calculateMsneNeuroph(neuralNet,test);
                 double msne = calculateMsne(neuralNet,test);
                 
                 Training t = new Training();
@@ -88,8 +88,19 @@ public class NeurophSweden {
     }
 
     private void serializeMaxMsne() {
+        
+        Training max = trainings.get(0);
+        for(Training t: trainings) {
+            if(max.msne<t.msne) {
+                max=t;
+            }
+        }
+        
+        max.neuralNet.save("file.nnet");
+        
     }
 
+    //ovo potencijalno ne radi zato sto izlazna varijabla nije 1 ili 0
     private void calculateAccNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
         Evaluation evaluation = new Evaluation();
         evaluation.addEvaluator(new ClassifierEvaluator.Binary(0.5));
@@ -127,11 +138,33 @@ public class NeurophSweden {
         return acc;
     }
 
-    private void calculateAccMsne(MultiLayerPerceptron neuralNet, DataSet test) {
+    private void calculateMsneNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        
+        Evaluation evaluation = new Evaluation();
+        evaluation.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        evaluation.evaluate(neuralNet, test);
+        
+        System.out.println("Msne Neuroph: " + evaluation.getMeanSquareError());     
     }
 
     private double calculateMsne(MultiLayerPerceptron neuralNet, DataSet test) {
-        return 0;
+        
+        double sumError=0,msne=0;
+        
+        for(DataSetRow row : test) {
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+            
+            double actual = row.getDesiredOutput()[0];
+            double predicted = neuralNet.getOutput()[0];
+            
+            sumError += Math.pow(predicted-actual,2);
+        }
+        
+        msne= (double) sumError/(2*test.size());
+        System.out.println("Msne: " + msne);
+        return msne;
     }
+        
     
 }
