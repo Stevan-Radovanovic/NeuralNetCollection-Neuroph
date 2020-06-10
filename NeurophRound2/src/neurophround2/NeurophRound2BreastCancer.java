@@ -16,7 +16,8 @@ public class NeurophRound2BreastCancer {
 
     
     public static void main(String[] args) {
-        new NeurophRound2BreastCancer().run();
+        //new NeurophRound2BreastCancer().run();
+        new NeurophRound2Glass().run();
     }
     
     //Serilization skipped
