@@ -36,12 +36,13 @@ public class NeurophRound2Diabetes {
             MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(input,20,10,output);
             neuralNet.setLearningRule(new BackPropagation());
             BackPropagation bp = neuralNet.getLearningRule();
+            bp.setLearningRate(lr);
             bp.setMaxError(0.07);
             
             neuralNet.learn(train);
         
             double accuracy = calculateAccuracy(neuralNet,test);
-            //calculateAccuracyNeuroph(neuralNet,test);
+            calculateAccuracyNeuroph(neuralNet,test);
             
             double msne = calculateMsne(neuralNet,test);
             calculateMsneNeuroph(neuralNet,test);
