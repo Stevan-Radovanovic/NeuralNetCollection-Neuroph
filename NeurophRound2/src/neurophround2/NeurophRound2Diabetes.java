@@ -41,7 +41,11 @@ public class NeurophRound2Diabetes {
             neuralNet.learn(train);
         
             double accuracy = calculateAccuracy(neuralNet,test);
-            calculateAccuracyNeuroph(neuralNet,test);
+            //calculateAccuracyNeuroph(neuralNet,test);
+            
+            double msne = calculateMsne(neuralNet,test);
+            calculateMsneNeuroph(neuralNet,test);
+            
             Training t = new Training();
             t.neuralNet = neuralNet;
             t.accuracy = accuracy;
@@ -95,5 +99,35 @@ public class NeurophRound2Diabetes {
         
         System.out.println("Saving file...");
         //max.neuralNet.save("file.nnet");
+    }
+
+    private double calculateMsne(MultiLayerPerceptron neuralNet, DataSet test) {
+        
+        double sumError=0;
+        
+        for(DataSetRow row : test) {
+                
+                neuralNet.setInput(row.getInput());
+                neuralNet.calculate();
+                
+                double actual = row.getDesiredOutput()[0];
+                double predicted = neuralNet.getOutput()[0];
+                
+                sumError+=Math.pow(actual-predicted,2);                                      
+            }
+        
+           double msne = (double) sumError / (2*test.size());
+           System.out.println("Msne: " + msne);
+           return msne;
+    }
+
+    private void calculateMsneNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation eval = new Evaluation();
+        eval.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        eval.evaluate(neuralNet,test);
+        
+        System.out.println("Msne Neuroph: " + eval.getMeanSquareError());
+        
+        
     }
 }

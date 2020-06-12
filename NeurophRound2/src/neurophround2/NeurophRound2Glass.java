@@ -21,11 +21,7 @@ import org.neuroph.util.data.norm.MaxNormalizer;
  * @author StevanMcfc
  */
 public class NeurophRound2Glass {
-    
-    public static void main(String[] args) {
-        new NeurophRound2BreastCancer().run();
-    }
-    
+        
     //Serilization skipped
     
     int input=9;
