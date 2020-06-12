@@ -3,6 +3,10 @@
 Na samom pocetku obavezno ucitati sve neophodne jar fajlove
 */
 
+/*
+U ovom zadatku skriveni neuroni treba da se ubace automatski, a ne preko petlje jedan po jedan, tu je greska
+*/
+
 package neurophdiabetes;
 
 import neurophdiabetes.Training;
