@@ -1,12 +1,3 @@
-
-/*
-Na samom pocetku obavezno ucitati sve neophodne jar fajlove
-*/
-
-/*
-U ovom zadatku skriveni neuroni treba da se ubace automatski, a ne preko petlje jedan po jedan, tu je greska
-*/
-
 package neurophdiabetes;
 
 import neurophdiabetes.Training;
@@ -14,20 +5,22 @@ import java.util.ArrayList;
 import org.neuroph.core.NeuralNetwork;
 import org.neuroph.core.data.DataSet;
 import org.neuroph.core.data.DataSetRow;
+import org.neuroph.core.events.LearningEvent;
+import org.neuroph.core.events.LearningEventListener;
 import org.neuroph.eval.ClassifierEvaluator;
 import org.neuroph.eval.Evaluation;
 import org.neuroph.eval.classification.ClassificationMetrics;
 import org.neuroph.eval.classification.ConfusionMatrix;
 import org.neuroph.nnet.MultiLayerPerceptron;
+import org.neuroph.nnet.learning.BackPropagation;
 import org.neuroph.nnet.learning.MomentumBackpropagation;
 import org.neuroph.util.data.norm.MaxNormalizer;
 
-public class NeurophDiabetes {
+public class NeurophDiabetes implements LearningEventListener {
 
-    int inputCount = 8; //Pise u tekstu zadatka, broj ulaznih varijabli
-    int outputCount = 1; //pise u tekstu zadatka, broj izlaznih varijabli
-    double[] learningRates = {0.2, 0.4, 0.6}; //pise u tekstu
-    int[] hiddenNeurons = {20,10}; //pise u tekstu
+    int input = 8;
+    int output = 1;
+    double[] learningRates = {0.2, 0.4, 0.6};
     ArrayList<Training> trainings = new ArrayList<>();
 
     public static void main(String[] args) {
@@ -36,107 +29,43 @@ public class NeurophDiabetes {
 
     private void run() {
 
-        //Ovaj deo uvek isti, osim ako eventualno ne traze na kraju da se promesaju redovi, onda bez shuffle
-        DataSet dataSet = DataSet.createFromFile("diabetes_data.csv", inputCount, outputCount, ",");
+        System.out.println("Creating DataSet...");
+        DataSet dataSet = DataSet.createFromFile("diabetes_data.csv", input, output, ",");
+        System.out.println("Normalizing...");
         MaxNormalizer normalizer = new MaxNormalizer(dataSet);
         normalizer.normalize(dataSet);
+        System.out.println("Shuffling...");
         dataSet.shuffle();
 
-        //Podela na train  i test, odnos pise u tekstu
+        System.out.println("Spliting...");
         DataSet[] dataSets = dataSet.createTrainingAndTestSubsets(0.70, 0.30);
         DataSet train = dataSets[0];
         DataSet test = dataSets[1];
         
         //Inicijalizacija varijabli koje nam trebaju za prosecan broj iteracija
-        int numberOfTrainings = 0;
         int numberOfItterations = 0;
 
-        //dve for petlje, spoljasnja za sve learningRates, unutrasnja za sve skrivene neurone
-        for (double lr : learningRates) {
-            for(int hn : hiddenNeurons) {
-                MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(inputCount, hn, outputCount);
-                MomentumBackpropagation bp = (MomentumBackpropagation) neuralNet.getLearningRule();
-                bp.setMaxError(0.07); //ovo uvek ovako
-                bp.setLearningRate(lr);
-
-                neuralNet.learn(train);
-
-                numberOfTrainings++;
-                numberOfItterations+=bp.getCurrentIteration();
-                
-                //Ovo pozivamo i pravimo ako nam je receno da sami pravimo funkcije
-                double accuracy = evaluateAccuracy(neuralNet, test);
-                
-                //Ovo pozivamo ako nam nije receno da sami pravimo funkcije
-                evaluateAccuracyNeuroph(neuralNet, test);
-
-                Training t = new Training(neuralNet, accuracy);
-                trainings.add(t);
-            }
+        for(double lr : learningRates) {
+            MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(input,20,10,output);
+            neuralNet.setLearningRule(new BackPropagation());
+            BackPropagation bp = (BackPropagation) neuralNet.getLearningRule();
+            
+            bp.setLearningRate(lr);
+            bp.setMaxError(0.07);
+            bp.addListener(this);
+            
+            neuralNet.learn(train);
+            
+            System.out.println("Number of iterations for lr: " + lr + " is  " + bp.getCurrentIteration());
+            
+            double msne = calculateMsne(neuralNet,test);
+            calculateMsneNeuroph(neuralNet,test);
+            double accuracy = calculateAccuracy(neuralNet,test);
+            calculateAccuracyNeuroph(neuralNet,test);
+            trainings.add(new Training(neuralNet,accuracy,msne));
         }
 
-        //Stampamo prosecan broj iteracija
-        System.out.println((double)numberOfItterations/numberOfTrainings);
-       
-        //Funkcija za serijalizaciju u fajl
         saveMaxAccuracyNet();
-    }
-
-    //Neuroph racuna sam
-    private void evaluateAccuracyNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
-        
-        //Ovde sve napamet
-        Evaluation evaluation = new Evaluation();
-        evaluation.addEvaluator(new ClassifierEvaluator.Binary(0.5));
-        evaluation.evaluate(neuralNet, test);
-
-        ClassifierEvaluator evaluator = evaluation.getEvaluator(ClassifierEvaluator.Binary.class);
-        ConfusionMatrix cm = evaluator.getResult();
-        System.out.println("Matrica konfuzije Neuroph: ");
-        System.out.println(cm.toString());
-
-        ClassificationMetrics[] metrics = ClassificationMetrics.createFromMatrix(cm);
-        ClassificationMetrics.Stats average = ClassificationMetrics.average(metrics);
-
-        System.out.println("Accuracy neuroph: " + average.accuracy);
-
-    }
-
-    //Rucno pravljenje funkcije
-    private double evaluateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
-        int tp = 0, tn = 0, fp = 0, fn = 0;
-
-        //Za svaki red u test data setu
-        for (DataSetRow row : test) {
-            //Ova dva reda napamet
-            neuralNet.setInput(row.getInput());
-            neuralNet.calculate();
-
-            //Stvarna i predicted vrednost
-            double actual = row.getDesiredOutput()[0];
-            double predicted = neuralNet.getOutput()[0];
-
-            if (actual == 1.0 && predicted > 0.5) {
-                tp++;
-            }
-            if (actual == 0.0 && predicted <= 0.5) {
-                tn++;
-            }
-            if (actual == 1.0 && predicted <= 0.5) {
-                fn++;
-            }
-
-            if (actual == 0.0 && predicted > 0.5) {
-                fp++;
-            }
-        }
-
-        //Sve sto smo tacno predvideli, bilo pozitivno, bilo negativno
-        double accuracy = (double) (tp + tn) / (tp + tn + fp + fn);
-
-        System.out.println("Accuracy: " + accuracy);
-
-        return accuracy;
     }
 
     private void saveMaxAccuracyNet() {
@@ -147,8 +76,74 @@ public class NeurophDiabetes {
             }
         }
 
-        System.out.println("Saving net with max accuracy");
-        max.neuralNet.save("net.nnet");
+        System.out.println("Saving net with max accuracy...");
+        //max.neuralNet.save("net.nnet");
+    }
+
+    private double calculateMsne(MultiLayerPerceptron neuralNet, DataSet test) {
+        double sumError = 0;
+        
+        for(DataSetRow row : test) {
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+            
+            double predicted = neuralNet.getOutput()[0];
+            double actual = row.getDesiredOutput()[0];
+            
+            sumError += Math.pow(actual-predicted,2);
+        }
+        
+        double msne = (double)sumError/(2*test.size());
+        System.out.println("Msne: " + msne);
+        return msne;
+    }
+
+    private double calculateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
+        double total = 0,good=0;
+        
+        for(DataSetRow row : test) {
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+            
+            double predicted = neuralNet.getOutput()[0];
+            double actual = row.getDesiredOutput()[0];
+            
+           if((actual==1 && predicted>0.5) || (actual==0 && predicted<=0.5)) good++;
+           total++;
+        }
+        
+        double accuracy = (double)good/total;
+        System.out.println("Accuracy: " + accuracy);
+        return accuracy;
+    }
+
+    private void calculateMsneNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation eval = new Evaluation();
+        eval.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        eval.evaluate(neuralNet, test);
+        
+        System.out.println("Msne Neuroph: " + eval.getMeanSquareError());
+    }
+
+    private void calculateAccuracyNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation eval = new Evaluation();
+        eval.addEvaluator(new ClassifierEvaluator.Binary(0.5));
+        eval.evaluate(neuralNet, test);
+        
+        ConfusionMatrix cm = eval.getEvaluator(ClassifierEvaluator.Binary.class).getResult();
+        ClassificationMetrics[] metrics = ClassificationMetrics.createFromMatrix(cm);
+        ClassificationMetrics.Stats average = ClassificationMetrics.average(metrics);
+        System.out.println("Accuracy Neuroph: " + average.accuracy);
+              
+    }
+
+    @Override
+    public void handleLearningEvent(LearningEvent event) {
+        BackPropagation bp = (BackPropagation) event.getSource();
+        
+        if(bp.isStopped()) {
+            System.out.println("Training stopped at iteration " + bp.getCurrentIteration() + " with " + bp.getTotalNetworkError() + " error");
+        }
     }
 
 }

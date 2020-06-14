@@ -14,13 +14,15 @@ import org.neuroph.core.NeuralNetwork;
 public class Training {
     public NeuralNetwork neuralNet;
     public double accuracy;
+    public double msne;
 
     public Training() {
     }
 
-    public Training(NeuralNetwork neuralNet,double accuracy) {
+    public Training(NeuralNetwork neuralNet,double accuracy,double msne) {
         this.neuralNet = neuralNet;
         this.accuracy = accuracy;
+        this.msne = msne;
     }
 
 
