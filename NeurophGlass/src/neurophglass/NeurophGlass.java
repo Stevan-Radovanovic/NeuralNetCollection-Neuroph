@@ -3,6 +3,8 @@ package neurophglass;
 import java.util.ArrayList;
 import org.neuroph.core.data.DataSet;
 import org.neuroph.core.data.DataSetRow;
+import org.neuroph.core.events.LearningEvent;
+import org.neuroph.core.events.LearningEventListener;
 import org.neuroph.eval.ClassifierEvaluator;
 import org.neuroph.eval.Evaluation;
 import org.neuroph.eval.classification.ClassificationMetrics;
@@ -12,13 +14,14 @@ import org.neuroph.nnet.learning.MomentumBackpropagation;
 import org.neuroph.util.data.norm.MaxNormalizer;
 
 
-public class NeurophGlass {
+public class NeurophGlass implements LearningEventListener {
 
     int input = 9;
     int output = 7;
-    ArrayList<Training> array = new ArrayList<Training>();
-    double[] lr = {0.2,0.4,0.6};
-    int[] hn = {10,20,30};
+    ArrayList<Training> trainings = new ArrayList<Training>();
+    double[] learningRates = {0.2,0.4,0.6};
+    int[] hiddenNeurons = {10,20,30};
+    String[] labels = new String[]{"s1","s2","s3","s4","s5","s6","s7"};
     
     public static void main(String[] args) {
         new NeurophGlass().run();
@@ -26,150 +29,147 @@ public class NeurophGlass {
     
     public void run() {
         
+        System.out.println("Creating from file...");
         DataSet data = DataSet.createFromFile("glass.csv", input, output, ",");
+        System.out.println("Normalizing...");
         MaxNormalizer max = new MaxNormalizer(data);
         max.normalize(data);
+        System.out.println("Shuffling...");
         data.shuffle();
         
+        System.out.println("Splitting...");
         DataSet[] split = data.split(0.65,0.35);
         DataSet train = split[0];
         DataSet test = split[1];
         
-        int iterations=0;
-        int trainings=0;
+        int numberOfIterations=0;
+        int numberOfTrainings=0;
         
-        for(double l: lr) {
-            for(int h: hn) {
-                System.out.println("Learning rate: " + l + ". Hidden Neurons: " + h);
-                MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(input,h,output);
-                
+        for(double lr: learningRates) {
+            for(int hn: hiddenNeurons) {
+                System.out.println("Learning rate: " + lr + ". Hidden Neurons: " + hn);
+                MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(input,hn,output);
                 neuralNet.setLearningRule(new MomentumBackpropagation());
-                MomentumBackpropagation bp = (MomentumBackpropagation) neuralNet.getLearningRule();
+                MomentumBackpropagation mbp = (MomentumBackpropagation) neuralNet.getLearningRule();
+                mbp.setMomentum(0.6);
+                mbp.setMaxIterations(100); //Not given in the task
+                mbp.addListener(this);
                 
-                bp.setMomentum(0.6);
-                bp.setMaxError(0.07);
-                bp.setLearningRate(l);
-
                 neuralNet.learn(train);
                 
-                double accuracy = calculateAccuracy(neuralNet,test);
-                calculateAccuracyNeuroph(neuralNet, test);
+                double acc = calculateAccuracy(neuralNet,test);
+                calculateAccuracyNeuroph(neuralNet,test);
+                double msne = calculateMsne(neuralNet,test);
+                calculateMsneNeuroph(neuralNet,test);
+                trainings.add(new Training(neuralNet,msne,acc));
                 
-                trainings++;
-                iterations+=bp.getCurrentIteration();
-                
-                array.add(new Training(accuracy,neuralNet));
+                numberOfIterations+=mbp.getCurrentIteration();
+                numberOfTrainings++;              
             }
         }
         
-        System.out.println("Iteration average: " + (double)iterations/trainings);
+        System.out.println("Average Iterations: " + (double)numberOfIterations/numberOfTrainings);
         serialize();
-    }
-    
-    public void serialize() {
-        
-        Training max = array.get(0);
-        for(Training t : array) {
-            if(max.accuracy<t.accuracy) {
-                max = t;
-            }
-        }
-        System.out.println("Saving file");
-        max.neuralNet.save("file.nnet");
-        
     }
     
     public double calculateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
         
-        //ovo je kod ako imamo samo jednu izlaznu
-        /*
-        int tp=0,fp=0,fn=0,tn=0;
+        double sumAcc=0;
+        ConfusionMatrix cm = new ConfusionMatrix(labels);
         
         for(DataSetRow row : test) {
-            
             neuralNet.setInput(row.getInput());
             neuralNet.calculate();
             
-            double actual = row.getDesiredOutput()[0];
-            double predicted = neuralNet.getOutput()[0];
-         
-             if (actual == 1.0 && predicted > 0.5) {
-                tp++;
-            }
-            if (actual == 0.0 && predicted <= 0.5) {
-                tn++;
-            }
-            if (actual == 1.0 && predicted <= 0.5) {
-                fn++;
-            }
-            if (actual == 0.0 && predicted > 0.5) {
-                fp++;
-            }
+            int actual = getMaxIndex(row.getDesiredOutput());
+            int predicted = getMaxIndex(neuralNet.getOutput());
             
-        }
-        double accuracy = (double)(tp+tn)/(tp+tn+fn+fp);
-        System.out.println("Accuracy: " + accuracy);
-        return accuracy;
-    */
-        String[] classLabels = {"s1", "s2", "s3", "s4", "s5", "s6", "s7"};
-        ConfusionMatrix mk = new ConfusionMatrix(classLabels);
-
-        for (DataSetRow row : test) {
-            neuralNet.setInput(row.getInput());
-            neuralNet.calculate();
-
-            int actual = getMaxInArray(row.getDesiredOutput());
-            int predicted = getMaxInArray(neuralNet.getOutput());
-
-            mk.incrementElement(actual, predicted);
+            cm.incrementElement(actual, predicted);
         }
         
-        System.out.println(mk.toString());
-
-        double accuracy = 0;
-
-        for (int i = 0; i < output; i++) {
-            int tp = mk.getTruePositive(i);
-            int tn = mk.getTrueNegative(i);
-            int fp = mk.getFalsePositive(i);
-            int fn = mk.getFalseNegative(i);
-
-            accuracy += (double) (tp + tn) / (tp + tn + fp + fn);
+        for(int i=0;i<output;i++) {
+            int tp = cm.getTruePositive(i);
+            int tn = cm.getTrueNegative(i);
+            int fp = cm.getFalsePositive(i);
+            int fn = cm.getFalseNegative(i);
+            sumAcc+= (double)(tp+tn)/(tp+tn+fn+fp);
         }
-
-        double averageAcc = (double) accuracy / output;
-
-        System.out.println("Accuracy: " + averageAcc);
-
-        return averageAcc;
+        
+        double acc = (double) sumAcc/output;
+        System.out.println("Accuracy: " + acc);
+        return acc;
     }
     
     public void calculateAccuracyNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
-        Evaluation evaluation = new Evaluation();
-        String[] classLabels = {"s1", "s2", "s3", "s4", "s5", "s6", "s7"};
-        evaluation.addEvaluator(new ClassifierEvaluator.MultiClass(classLabels));
-        evaluation.evaluate(neuralNet, test);
-
-        ClassifierEvaluator evaluator = evaluation.getEvaluator(ClassifierEvaluator.MultiClass.class);
-        ConfusionMatrix cm = evaluator.getResult();
-        System.out.println(cm.toString());
-
+        Evaluation eval = new Evaluation();
+        eval.addEvaluator(new ClassifierEvaluator.MultiClass(labels));
+        eval.evaluate(neuralNet, test);
+        
+        ConfusionMatrix cm = eval.getEvaluator(ClassifierEvaluator.MultiClass.class).getResult();
         ClassificationMetrics[] metrics = ClassificationMetrics.createFromMatrix(cm);
         ClassificationMetrics.Stats average = ClassificationMetrics.average(metrics);
-
-        System.out.println("Accuracy neuroph: " + average.accuracy);
+        
+        System.out.println("Accuracy: " + average.accuracy);  
     }
     
-     private int getMaxInArray(double[] array) {
-        int position = 0;
-
-        for (int i = 1; i < array.length; i++) {
-            if (array[position] < array[i]) {
-                position = i;
+    private double calculateMsne(MultiLayerPerceptron neuralNet, DataSet test) {
+        double sum=0;
+        
+        for(DataSetRow row : test) {
+            neuralNet.setInput(row.getInput());
+            neuralNet.calculate();
+            
+            double[] actual = row.getDesiredOutput();
+            double[] predicted = neuralNet.getOutput();
+            
+            for(int i=0;i<actual.length;i++) {
+                sum+=Math.pow(actual[i]-predicted[i], 2);
             }
         }
+                     
+        double msne = (double) sum/(2*test.size());
+        System.out.println("Msne: " + msne);
+        return msne;
+    }
 
-        return position;
+    private void calculateMsneNeuroph(MultiLayerPerceptron neuralNet, DataSet test) {
+        Evaluation eval = new Evaluation();
+        eval.addEvaluator(new ClassifierEvaluator.MultiClass(labels));
+        eval.evaluate(neuralNet, test);
+        
+        System.out.println("Msne Neuroph: " + eval.getMeanSquareError());
+    }
+    
+    private void serialize() {
+        
+        Training max = trainings.get(0);
+        for(Training t: trainings) {
+            if(max.accuracy<t.accuracy) max=t;
+        }
+        
+        System.out.println("Saving file...");
+        //max.neuralNet.save("file.nnet");
+        
+    }
+    
+    private int getMaxIndex(double[] array) {
+        
+        int max = 0;
+        
+        for(int i=0;i<array.length;i++) {
+            if(array[max]<array[i]) max=i;
+        }
+        
+        return max;
+    }
+
+    @Override
+    public void handleLearningEvent(LearningEvent event) {
+
+        MomentumBackpropagation mbp = (MomentumBackpropagation)event.getSource();
+        if(mbp.isStopped()) {
+            System.out.println("Training stopped: TotalNet: " + mbp.getTotalNetworkError() + " Iterations: " + mbp.getCurrentIteration() );
+        }
     }
     
 }
