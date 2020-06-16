@@ -28,6 +28,7 @@
     ArrayList<Training> trainings = new ArrayList<>();
     double[] learningRates = {0.2, 0.4, 0.6};
     int[] hiddenNeurons = {10, 20, 30};
+//Obratiti paznju da li su skriveni neuroni u jednom ili u vise slojeva
 *********************************************************************
 
 **********************
@@ -60,16 +61,16 @@
 *******************************
 *[Neuroph Class run - part II]*
 *******************************
-//Dve for petlje, uvek iste
+//Dve for petlje, uvek iste (Ukoliko ima vise slojeva skrivenih neurona, umesto druge for petlje, vrednosti se ubacuju direktno u  MLP konstruktor
     for(double l: lr) {
        for(int h: hn) {
               System.out.println("Learning rate: " + l + ". Hidden Neurons: " + h);
-//Inicijalizacija mreze
+//Inicijalizacija mreze (Ako nije naglaseno postavljanje momenta na neku vrednost, koristi se BackPropagation!
               MultiLayerPerceptron neuralNet = new MultiLayerPerceptron(input,h,output);  
               neuralNet.setLearningRule(new MomentumBackpropagation());
               MomentumBackpropagation bp = (MomentumBackpropagation) neuralNet.getLearningRule();
 
-//Ovo uvek, momentum je dat u tekstu
+//Ovo uvek, momentum i maxError su dati u tekstu, ne namestati ih ako nisu
               bp.setMomentum(0.6);               
               bp.setMaxError(0.07);
               bp.setLearningRate(l);
@@ -88,15 +89,17 @@
 ********************************
 *[Neuroph Class run - part III]*
 ********************************
-//Ispisujemo prosecan broj iteracija i pozivamo funkciju za serijalizaciju koja nam je trazeno
+//Ispisujemo prosecan broj iteracija i pozivamo funkciju za serijalizaciju koja nam je trazena
     System.out.println("Iteration average: " + (double)iterations/trainings);
     serialize();
+//Ovaj ispis moze doci i u svakoj for petlji, ako se trazi po treningu broj iteracija, a ne prosecan za celu mrezu
 *********************************************************************
 
 ***************************************
 *[Neuroph Class accuracy - one output]*
 ***************************************
 //Uvek ide ovako ako imamo samo jednu izlaznu
+//Drugi nacin - umesto tp i tn -> good, i total koji se uvecava uvek. Accuracy onda dobijamo kao good/total
 public double calculateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
         
         int tp=0,fp=0,fn=0,tn=0;
@@ -143,9 +146,9 @@ public double calculateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
             neuralNet.setInput(row.getInput());
             neuralNet.calculate();
 
-//getMaxInArray je pomocna funkcija, prosta funkcija za nalazenje maksimuma u nizu double vrednosti	
-            int actual = getMaxInArray(row.getDesiredOutput());
-            int predicted = getMaxInArray(neuralNet.getOutput());
+//getMaxIndexArray je pomocna funkcija, prosta funkcija za nalazenje indeksa najveceg elementa u nizu double vrednosti	
+            int actual = getMaxIndexArray(row.getDesiredOutput());
+            int predicted = getMaxIndexArray(neuralNet.getOutput());
 
             mk.incrementElement(actual, predicted);
         }
@@ -164,9 +167,7 @@ public double calculateAccuracy(MultiLayerPerceptron neuralNet, DataSet test) {
         }
 
         double averageAcc = (double) accuracy / output;
-
         System.out.println("Accuracy: " + averageAcc);
-
         return averageAcc;
     }
 *********************************************************************
@@ -302,6 +303,7 @@ private void evaluateAccuracyNeuroph(MultiLayerPerceptron neuralNet, DataSet tes
             }
         }
         System.out.println("Saving file");
+//Naziv fajla nije bitan, ekstenzija mora biti .nnet
         max.neuralNet.save("file.nnet");
         
     }
